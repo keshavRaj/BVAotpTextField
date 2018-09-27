@@ -8,13 +8,17 @@
 
 import UIKit
 
-class ViewController: UIViewController, BVAPasswordTextFielDelegate {
+class ViewController: UIViewController, BVAPasswordTextFielDelegate, UIGestureRecognizerDelegate {
 
     @IBOutlet weak var passwordField: BVAPasswordTextField!
     override func viewDidLoad() {
         super.viewDidLoad()
         passwordField.delegate = self
-       // view.addGestureRecognizer(tapGesture)
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(ViewController.userTapped))
+        tapGesture.numberOfTapsRequired = 1
+        tapGesture.delegate = self
+        tapGesture.cancelsTouchesInView = false
+        view.addGestureRecognizer(tapGesture)
         // Do any additional setup after loading the view, typically from a nib.
     }
 
@@ -23,7 +27,13 @@ class ViewController: UIViewController, BVAPasswordTextFielDelegate {
         // Dispose of any resources that can be recreated.
     }
     
+//    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+//        print("Touch view is \(touch.view == self.view)")
+//        return touch.view == self
+//    }
+    
     @objc func userTapped() {
+        print("User tapped")
         view.endEditing(true)
     }
     

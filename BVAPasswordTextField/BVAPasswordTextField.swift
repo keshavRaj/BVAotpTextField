@@ -252,7 +252,7 @@ extension BVAPasswordTextField {
         let animation = CABasicAnimation(keyPath: "opacity")
         animation.fromValue = 0.0
         animation.toValue = 1.0
-        animation.duration = 0.2
+        animation.duration = 0.4
         animation.repeatCount = .infinity
         animation.isRemovedOnCompletion = true
         animation.timingFunction = CAMediaTimingFunction(name: kCAMediaTimingFunctionEaseInEaseOut)
