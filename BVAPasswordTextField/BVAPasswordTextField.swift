@@ -10,7 +10,11 @@ import Foundation
 import UIKit
 
 enum BVAPasswordBorderType: Int {
-    case top = 1, middle, bottom
+    case top = 1, middle, bottom, rect
+}
+
+protocol BVAPasswordTextFielDelegate: class {
+    func textDidChange(_ field: BVAPasswordTextField, text: String)
 }
 
 class BVAPasswordTextField: UIControl {
@@ -26,19 +30,34 @@ class BVAPasswordTextField: UIControl {
             }
         }
     }
-    @IBInspectable var borderColor: UIColor = UIColor.green
+    @IBInspectable var borderColor: UIColor = UIColor.gray
     @IBInspectable var textColor: UIColor = UIColor.black
     @IBInspectable var imageWidth: CGFloat = 0 //Change from 0 to give the image width
+    
+    public weak var delegate: BVAPasswordTextFielDelegate?
+    public var value = ""
     
     private var _borderType: BVAPasswordBorderType?
     private var _labels = [UILabel]()
     private var _imageViews = [UIImageView]()
     private var _borderFeelViews = [UIView]()
     private var _isLayoutForFirstTime = true
+    private var _inputCount: Int!
+    private var _currentIndex = 0
     
     public var keyboardType: UIKeyboardType = .numberPad
-    override var canBecomeFirstResponder: Bool { return true }
-    override var canResignFirstResponder: Bool { return true }
+    override var canBecomeFirstResponder: Bool {
+        if _currentIndex < _inputCount {
+            flashAnimation(at: _currentIndex)
+        }
+        return true
+    }
+    override var canResignFirstResponder: Bool {
+        if _currentIndex < _inputCount {
+            removeAnimation(at: _currentIndex, shouldHide: false)
+        }
+        return true
+    }
     
     
     init(frame: CGRect, inputCount: Int, font: UIFont? = nil, textColor: UIColor = UIColor.black, borderColor: UIColor = UIColor.red, placeholderImage: UIImage? = nil, placeholderWidth: CGFloat = 0, borderType: BVAPasswordBorderType? = nil) {
@@ -69,6 +88,7 @@ class BVAPasswordTextField: UIControl {
     
     
     private func configureUI() {
+        _inputCount = inputCount
         let labelSpacing = textSpacing > 0 ? textSpacing : getLabelSpacing()
         for i in 0 ..< inputCount {
             //Create labels
@@ -76,15 +96,17 @@ class BVAPasswordTextField: UIControl {
             label.font = font
             label.textColor = textColor
             label.textAlignment = .center
-            label.text = "1"
             label.translatesAutoresizingMaskIntoConstraints = false
             _labels.append(label)
             
             //Add border feeling
-            if let borderType = _borderType {
+            if let borderType = _borderType,
+                borderType != .rect,
+                placeholderImage == nil {
                 let border = UIView()
                 border.translatesAutoresizingMaskIntoConstraints = false
                 border.backgroundColor = borderColor
+                _borderFeelViews.append(border)
                 label.addSubview(border)
                 
                 let views = [
@@ -93,7 +115,7 @@ class BVAPasswordTextField: UIControl {
                 ]
                 let horizontalConstraint = NSLayoutConstraint.constraints(withVisualFormat: "H:|[border]|", options: [], metrics: nil, views: views)
                 let heightConstraint = NSLayoutConstraint(item: border, attribute: .height, relatedBy: .equal, toItem: nil, attribute: .notAnAttribute, multiplier: 1, constant: 1)
-                let verticalAllignmentConstraint: NSLayoutConstraint
+                var verticalAllignmentConstraint: NSLayoutConstraint?
                 switch borderType {
                 case .bottom:
                     verticalAllignmentConstraint = border.bottomAnchor.constraint(equalTo: label.bottomAnchor)
@@ -103,8 +125,12 @@ class BVAPasswordTextField: UIControl {
                     
                 case .middle:
                     verticalAllignmentConstraint = NSLayoutConstraint(item: border, attribute: .centerY, relatedBy: .equal, toItem: label, attribute: .centerY, multiplier: 1, constant: 0)
+                default:
+                    break
                 }
-                NSLayoutConstraint.activate(horizontalConstraint + [heightConstraint, verticalAllignmentConstraint])
+                if let vConstraint = verticalAllignmentConstraint {
+                NSLayoutConstraint.activate(horizontalConstraint + [heightConstraint, vConstraint])
+                }
             }
             
             //Add it to subview
@@ -117,26 +143,35 @@ class BVAPasswordTextField: UIControl {
                 label.leadingAnchor.constraint(equalTo: leadingAnchor).isActive = true
             } else {
                 addConstraint(NSLayoutConstraint(item: label, attribute: .leading, relatedBy: .equal, toItem: _labels[i - 1], attribute: .trailing, multiplier: 1, constant: labelSpacing))
-               addConstraint(NSLayoutConstraint(item: label, attribute: .width, relatedBy: .equal, toItem: _labels[i - 1], attribute: .width, multiplier: 1, constant: 0))
+                addConstraint(NSLayoutConstraint(item: label, attribute: .width, relatedBy: .equal, toItem: _labels[i - 1], attribute: .width, multiplier: 1, constant: 0))
             }
             if i == inputCount - 1 { //last label....Allign trailing with trailing
                 label.trailingAnchor.constraint(equalTo: trailingAnchor).isActive = true
             }
+            if let borderType = _borderType,
+                borderType == .rect,
+                placeholderImage == nil {
+                label.layer.borderWidth = 1
+                label.layer.borderColor = borderColor.cgColor
+                label.layer.masksToBounds = true
+            }
             
             //Create imageViews
-            let imageView = UIImageView()
-            imageView.image = placeholderImage
-            imageView.translatesAutoresizingMaskIntoConstraints = false
-            _imageViews.append(imageView)
-            
-            //Add as subview
-            addSubview(imageView)
-            
-            //Add constraints....Allign top, leading, trailing and bottom with label
-            imageView.topAnchor.constraint(equalTo: label.topAnchor).isActive = true
-            imageView.leadingAnchor.constraint(equalTo: label.leadingAnchor).isActive = true
-            imageView.bottomAnchor.constraint(equalTo: label.bottomAnchor).isActive = true
-            imageView.trailingAnchor.constraint(equalTo: label.trailingAnchor).isActive = true
+            if placeholderImage != nil {
+                let imageView = UIImageView()
+                imageView.image = placeholderImage
+                imageView.translatesAutoresizingMaskIntoConstraints = false
+                _imageViews.append(imageView)
+                
+                //Add as subview
+                addSubview(imageView)
+                
+                //Add constraints....Allign top, leading, trailing and bottom with label
+                imageView.topAnchor.constraint(equalTo: label.topAnchor).isActive = true
+                imageView.leadingAnchor.constraint(equalTo: label.leadingAnchor).isActive = true
+                imageView.bottomAnchor.constraint(equalTo: label.bottomAnchor).isActive = true
+                imageView.trailingAnchor.constraint(equalTo: label.trailingAnchor).isActive = true
+            }
         }
         
     }
@@ -166,23 +201,84 @@ class BVAPasswordTextField: UIControl {
     }
     
     @objc func showKeyboard() {
-        becomeFirstResponder()
+        if !isFirstResponder {
+            becomeFirstResponder()
+        }
+        debugPrint("Becoming first responder")
     }
 }
 
 extension BVAPasswordTextField: UIKeyInput {
     
-    
     public var hasText: Bool {
-        return false
+        return !(value.isEmpty)
     }
     
     
     public func insertText(_ text: String) {
-        print("\(text)")
+        debugPrint("\(text)")
+        if _currentIndex < _inputCount { //Else we are not processing the entered text as input count will increase
+            value.append(text)
+            delegate?.textDidChange(self, text: value)
+            removeAnimation(at: _currentIndex)
+            _labels[_currentIndex].text = text
+            _currentIndex += 1
+            if _currentIndex < _inputCount {
+                flashAnimation(at: _currentIndex)
+            }
+            
+        }
     }
     
     public func deleteBackward() {
+        debugPrint("Delete pressed")
+        if _currentIndex != 0 {
+            if _currentIndex != _inputCount {
+                removeAnimation(at: _currentIndex, shouldHide: false)
+            }
+            _currentIndex -= 1
+            _labels[_currentIndex].text = nil
+            flashAnimation(at: _currentIndex)
+            value = String(value.dropLast())
+            delegate?.textDidChange(self, text: value)
+        }
         
+    }
+}
+
+//MARK:- Animation
+extension BVAPasswordTextField {
+    func flashAnimation(at index: Int) {
+        let animation = CABasicAnimation(keyPath: "opacity")
+        animation.fromValue = 0.0
+        animation.toValue = 1.0
+        animation.duration = 0.2
+        animation.repeatCount = .infinity
+        animation.isRemovedOnCompletion = true
+        animation.timingFunction = CAMediaTimingFunction(name: kCAMediaTimingFunctionEaseInEaseOut)
+        
+        if placeholderImage != nil {
+            _imageViews[index].isHidden = false
+            _imageViews[index].layer.add(animation, forKey: "flashAnimation")
+        } else {
+            if let borderType = _borderType,
+                borderType != .rect {
+                _borderFeelViews[index].isHidden = false
+                _borderFeelViews[index].layer.add(animation, forKey: "flashAnimation")
+            }
+        }
+    }
+    
+    func removeAnimation(at index: Int, shouldHide: Bool = true) {
+        if placeholderImage != nil {
+            _imageViews[index].layer.removeAllAnimations()
+            _imageViews[index].isHidden = shouldHide
+        } else {
+            if let borderType = _borderType,
+                borderType != .rect {
+                _borderFeelViews[index].layer.removeAllAnimations()
+                _borderFeelViews[index].isHidden = shouldHide
+            }
+        }
     }
 }
